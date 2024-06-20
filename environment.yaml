@@ -1,0 +1,26 @@
+name: geoh2_env_test
+channels:
+  - defaults
+  - conda-forge
+
+dependencies:
+  - python=3.9
+  - atlite=0.2.10
+  - cartopy
+  - gdal=2
+  - geopy
+  - geopandas
+  - matplotlib
+  - numpy
+  - openpyxl
+  - pandas
+  - pip
+  - pypsa
+  - rasterio!=1.2.10
+  - shapely=1.8.4
+  - xlsxwriter
+
+  - pip:
+    - cdsapi
+    - geopy
+    - PySimpleGUI

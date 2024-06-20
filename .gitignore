@@ -1,0 +1,11 @@
+
+Data/
+hydrobasins_lvl10/
+Cutouts/
+Parameters/
+Resources/
+Plots/
+**/.DS_Store
+.DS_Store
+temp/
+test.ipynb
