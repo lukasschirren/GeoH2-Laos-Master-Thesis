@@ -20,5 +20,5 @@ countries = countries.rename(columns={'name':'country'})
 
 # Reproject hexagons to match the CRS of countries
 hexagons = hexagons.to_crs(world.crs)
-hexagons_with_country = gpd.sjoin(hexagons, countries, op='intersects') # changed from "within"
+hexagons_with_country = gpd.sjoin(hexagons, countries, predicate='intersects') # changed from "within"
 hexagons_with_country.to_file('Data/hexagons_with_country.geojson', driver='GeoJSON')
