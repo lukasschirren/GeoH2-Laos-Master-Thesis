@@ -24,20 +24,40 @@ import time
 
 import xarray as xr
 from scipy.constants import physical_constants
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import warnings
+
+# Suppress warnings
+warnings.filterwarnings("ignore")
 
 logging.basicConfig(level=logging.ERROR)
 
-#########################################################################################################
-# Added for hydropower 
+
+def display_progress(iteration, total, prefix='', suffix=''):
+    """
+    Display progress in the terminal.
+    """
+    print(f'\r{prefix} {iteration}/{total} {suffix}', end='\r')
+    if iteration == total:
+        print()  # New line on completion
+
 def hydropower_potential(eta,flowrate,head):
     '''
     Calculate hydropower potential in Megawatts
-    
+
     Parameters
     ----------
-    eta: Efficiency
-    flowrate: Calculated with runoff * hydro-basin
-    head: height difference at hydropower site
+    eta : float
+        Efficiency of the hydropower plant.
+    flowrate : float
+        Flowrate calculated with runoff multiplied by the hydro-basin area, in cubic meters per hour.
+    head : float
+        Height difference at the hydropower site, in meters.
+
+    Returns
+    -------
+    float
+        Hydropower potential in Megawatts (MW).
     '''
     rho = 997 # kg/m3; Density of water
     g = physical_constants['standard acceleration of gravity'][0] # m/s2; Based on the CODATA constants 2018
@@ -45,6 +65,25 @@ def hydropower_potential(eta,flowrate,head):
     return (eta * rho * g * Q * head) / (1000 * 1000) # MW
 
 def hydropower_potential_with_capacity(flowrate, head, capacity, eta):
+    '''
+    Calculate the hydropower potential considering the capacity limit
+
+    Parameters
+    ----------
+    flowrate : float
+        Flowrate calculated with runoff multiplied by the hydro-basin area, in cubic meters per hour.
+    head : float
+        Height difference at the hydropower site, in meters.
+    capacity : float
+        Maximum hydropower capacity in Megawatts (MW).
+    eta : float
+        Efficiency of the hydropower plant.
+
+    Returns
+    -------
+    xarray DataArray
+        Capacity factor, which is the limited potential divided by the capacity.
+    '''
     potential = hydropower_potential(flowrate, head, eta)
     limited_potential = xr.where(potential > capacity, capacity, potential)
     capacity_factor = limited_potential / capacity
@@ -91,14 +130,156 @@ def demand_schedule(quantity, transport_state, transport_excel_path,
     quantity_per_delivery = quantity/annual_deliveries
     index = pd.date_range(start_date, end_date, periods=annual_deliveries)
     trucking_demand_schedule = pd.DataFrame(quantity_per_delivery, index=index, columns = ['Demand'])
-    trucking_hourly_demand_schedule = trucking_demand_schedule.resample('H').sum().fillna(0.)
+    trucking_hourly_demand_schedule = trucking_demand_schedule.resample('h').sum().fillna(0.)
 
     # schedule for pipeline
-    index = pd.date_range(start_date, end_date, freq = 'H')
+    index = pd.date_range(start_date, end_date, freq = 'h')
     pipeline_hourly_quantity = quantity/index.size
     pipeline_hourly_demand_schedule = pd.DataFrame(pipeline_hourly_quantity, index=index,  columns = ['Demand'])
 
     return trucking_hourly_demand_schedule, pipeline_hourly_demand_schedule
+
+def optimize_hexagon_trucking(hexagon, location, demand_parameters, 
+                              hexagons, transport_excel_path, weather_excel_path,
+                              country_parameters, wind_profile, pv_profile, hydro_profile):
+    '''
+    Optimizes the hydrogen plant components for trucking based on renewable potential, hydrogen demand, and country parameters.
+
+    Parameters
+    ----------
+    hexagon : int
+        Index of the hexagon being optimized.
+    location : str
+        Name of the demand center location.
+    demand_parameters : pandas DataFrame
+        DataFrame containing annual demand parameters for different locations.
+    hexagons : geopandas GeoDataFrame
+        GeoDataFrame containing hexagon data including renewable potential and other relevant parameters.
+    transport_excel_path : str
+        Path to the transport parameters Excel file.
+    weather_excel_path : str
+        Path to the weather parameters Excel file.
+    country_parameters : pandas DataFrame
+        DataFrame containing country-specific interest rates and lifetimes for various components.
+    wind_profile : xarray DataArray
+        DataArray of per-unit wind potential for the hexagons.
+    pv_profile : xarray DataArray
+        DataArray of per-unit solar potential for the hexagons.
+    hydro_profile : xarray DataArray, optional
+        DataArray of per-unit hydro potential for the hexagons.
+
+    Returns
+    -------
+    hexagon : int
+        Index of the hexagon that was optimized.
+    lcoh : float
+        Levelized cost per kg hydrogen.
+    wind_capacity : float
+        Optimal wind capacity in MW.
+    solar_capacity : float
+        Optimal solar capacity in MW.
+    hydro_capacity : float
+        Optimal hydro capacity in MW.
+    electrolyzer_capacity : float
+        Optimal electrolyzer capacity in MW.
+    battery_capacity : float
+        Optimal battery storage capacity in MW/MWh (1 hour batteries).
+    h2_storage : float
+        Optimal hydrogen storage capacity in MWh.
+    '''
+    hydrogen_demand_trucking, _ = demand_schedule(
+        demand_parameters.loc[location, 'Annual demand [kg/a]'],
+        hexagons.loc[hexagon, f'{location} trucking state'],
+        transport_excel_path,
+        weather_excel_path)
+    
+    country_series = country_parameters.loc[hexagons.country[hexagon]]
+    
+    lcoh, wind_capacity, solar_capacity, hydro_capacity, electrolyzer_capacity, battery_capacity, h2_storage = \
+        optimize_hydrogen_plant(wind_profile.sel(hexagon=hexagon),
+                                pv_profile.sel(hexagon=hexagon),
+                                hydro_profile.sel(hexagon=hexagon),
+                                wind_profile.time,
+                                hydrogen_demand_trucking,
+                                hexagons.loc[hexagon, 'theo_turbines'],
+                                hexagons.loc[hexagon, 'theo_pv'],
+                                hexagons.loc[hexagon, 'hydro'],
+                                country_series
+                                )
+    
+    return hexagon, lcoh, wind_capacity, solar_capacity, hydro_capacity, electrolyzer_capacity, battery_capacity, h2_storage
+
+
+def optimize_hexagon_pipeline(hexagon, location, demand_parameters, 
+                              hexagons, transport_excel_path, weather_excel_path,
+                              country_parameters, wind_profile, pv_profile, hydro_profile):
+    '''
+    Optimizes the hydrogen plant components for pipeline transport based on renewable potential, hydrogen demand, and country parameters.
+
+    Parameters
+    ----------
+    hexagon : int
+        Index of the hexagon being optimized.
+    location : str
+        Name of the demand center location.
+    demand_parameters : pandas DataFrame
+        DataFrame containing annual demand parameters for different locations.
+    hexagons : geopandas GeoDataFrame
+        GeoDataFrame containing hexagon data including renewable potential and other relevant parameters.
+    transport_excel_path : str
+        Path to the transport parameters Excel file.
+    weather_excel_path : str
+        Path to the weather parameters Excel file.
+    country_parameters : pandas DataFrame
+        DataFrame containing country-specific interest rates and lifetimes for various components.
+    wind_profile : xarray DataArray
+        DataArray of per-unit wind potential for the hexagons.
+    pv_profile : xarray DataArray
+        DataArray of per-unit solar potential for the hexagons.
+    hydro_profile : xarray DataArray, optional
+        DataArray of per-unit hydro potential for the hexagons.
+
+    Returns
+    -------
+    hexagon : int
+        Index of the hexagon that was optimized.
+    lcoh : float
+        Levelized cost per kg hydrogen.
+    wind_capacity : float
+        Optimal wind capacity in MW.
+    solar_capacity : float
+        Optimal solar capacity in MW.
+    hydro_capacity : float
+        Optimal hydro capacity in MW.
+    electrolyzer_capacity : float
+        Optimal electrolyzer capacity in MW.
+    battery_capacity : float
+        Optimal battery storage capacity in MW/MWh (1 hour batteries).
+    h2_storage : float
+        Optimal hydrogen storage capacity in MWh.
+    '''
+    _, hydrogen_demand_pipeline = demand_schedule(
+        demand_parameters.loc[location, 'Annual demand [kg/a]'],
+        hexagons.loc[hexagon, f'{location} trucking state'],
+        transport_excel_path,
+        weather_excel_path)
+    
+    country_series = country_parameters.loc[hexagons.country[hexagon]]
+    
+    lcoh, wind_capacity, solar_capacity, hydro_capacity, electrolyzer_capacity, battery_capacity, h2_storage = \
+        optimize_hydrogen_plant(wind_profile.sel(hexagon=hexagon),
+                                pv_profile.sel(hexagon=hexagon),
+                                hydro_profile.sel(hexagon=hexagon),
+                                wind_profile.time,
+                                hydrogen_demand_pipeline,
+                                hexagons.loc[hexagon, 'theo_turbines'],
+                                hexagons.loc[hexagon, 'theo_pv'],
+                                hexagons.loc[hexagon, 'hydro'],
+                                country_series
+                                )
+    
+    return hexagon, lcoh, wind_capacity, solar_capacity, hydro_capacity, electrolyzer_capacity, battery_capacity, h2_storage
+
 
 # in the future, may want to make hexagons a class with different features
 def optimize_hydrogen_plant(wind_potential, pv_potential, hydro_potential, times, demand_profile,
@@ -200,13 +381,13 @@ def optimize_hydrogen_plant(wind_potential, pv_potential, hydro_potential, times
     # Solve the model
     solver = 'gurobi'
     n.lopf(solver_name=solver,
-           solver_options = {'LogToConsole':0, 'OutputFlag':0},
+           solver_options = {'LogToConsole':0, 'OutputFlag':0, 'LogFile': ''},
            pyomo=False,
            extra_functionality=aux.extra_functionalities,
            )
     # Output results
 
-    lcoh = n.objective/(n.loads_t.p_set.sum()[0]/39.4*1000) # convert back to kg H2
+    lcoh = n.objective/(n.loads_t.p_set.sum().iloc[0]/39.4*1000) # convert back to kg H2
     wind_capacity = n.generators.p_nom_opt['Wind']
     solar_capacity = n.generators.p_nom_opt['Solar']
     hydro_capacity = n.generators.p_nom_opt['Hydro']
@@ -328,43 +509,49 @@ if __name__ == "__main__":
         )
     wind_profile = wind_profile.rename(dict(dim_0='hexagon'))
 
+    max_workers = 3
+
     for location in demand_centers:
+        # Trucking optimization
         lcohs_trucking = np.zeros(len(pv_profile.hexagon))
-        solar_capacities= np.zeros(len(pv_profile.hexagon))
-        wind_capacities= np.zeros(len(pv_profile.hexagon))
-        hydro_capacities= np.zeros(len(pv_profile.hexagon))
-        electrolyzer_capacities= np.zeros(len(pv_profile.hexagon))
+        solar_capacities = np.zeros(len(pv_profile.hexagon))
+        wind_capacities = np.zeros(len(pv_profile.hexagon))
+        hydro_capacities = np.zeros(len(pv_profile.hexagon))
+        electrolyzer_capacities = np.zeros(len(pv_profile.hexagon))
         battery_capacities = np.zeros(len(pv_profile.hexagon))
-        h2_storages= np.zeros(len(pv_profile.hexagon))
+        h2_storages = np.zeros(len(pv_profile.hexagon))
         start = time.process_time()
-        # function
-        for hexagon in pv_profile.hexagon.data:
-            hydrogen_demand_trucking, hydrogen_demand_pipeline = demand_schedule(
-                demand_parameters.loc[location,'Annual demand [kg/a]'],
-                hexagons.loc[hexagon,f'{location} trucking state'],
-                transport_excel_path,
-                weather_excel_path)
-            country_series = country_parameters.loc[hexagons.country[hexagon]]
-            lcoh, wind_capacity, solar_capacity, hydro_capacity, electrolyzer_capacity, battery_capacity, h2_storage =\
-                optimize_hydrogen_plant(wind_profile.sel(hexagon = hexagon),
-                                    pv_profile.sel(hexagon = hexagon),
-                                    hydro_profile.sel(hexagon = hexagon),
-                                    wind_profile.time,
-                                    hydrogen_demand_trucking,
-                                    hexagons.loc[hexagon,'theo_turbines'],
-                                    hexagons.loc[hexagon,'theo_pv'],
-                                    hexagons.loc[hexagon,'hydro'],
-                                    country_series,
-                                    # water_limit = hexagons.loc[hexagon,'delta_water_m3']
-                                    )
-            lcohs_trucking[hexagon] = lcoh
-            solar_capacities[hexagon] = solar_capacity
-            wind_capacities[hexagon] = wind_capacity
-            hydro_capacities[hexagon] = hydro_capacity
-            electrolyzer_capacities[hexagon] = electrolyzer_capacity
-            battery_capacities[hexagon] = battery_capacity
-            h2_storages[hexagon] = h2_storage
-        trucking_time = time.process_time()-start
+
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(optimize_hexagon_trucking, hexagon, location, demand_parameters, hexagons, 
+                                       transport_excel_path, weather_excel_path, country_parameters, wind_profile, 
+                                       pv_profile, hydro_profile): hexagon 
+                       for hexagon in pv_profile.hexagon.data}
+
+            total_hexagons = len(futures)
+            completed_hexagons = 0
+
+            for future in as_completed(futures):
+                hexagon = futures[future]
+                try:
+                    hexagon, lcoh, wind_capacity, solar_capacity, hydro_capacity, electrolyzer_capacity, battery_capacity, h2_storage = future.result()
+                    
+                    lcohs_trucking[hexagon] = lcoh
+                    solar_capacities[hexagon] = solar_capacity
+                    wind_capacities[hexagon] = wind_capacity
+                    hydro_capacities[hexagon] = hydro_capacity
+                    electrolyzer_capacities[hexagon] = electrolyzer_capacity
+                    battery_capacities[hexagon] = battery_capacity
+                    h2_storages[hexagon] = h2_storage
+
+                except Exception as e:
+                    print(f"Hexagon {hexagon} generated an exception: {e}")
+                
+                completed_hexagons += 1
+                display_progress(completed_hexagons, total_hexagons, prefix='Pipeline Progress:', suffix='Complete')
+
+        trucking_time = time.process_time() - start
 
         hexagons[f'{location} trucking solar capacity'] = solar_capacities
         hexagons[f'{location} trucking wind capacity'] = wind_capacities
@@ -372,58 +559,59 @@ if __name__ == "__main__":
         hexagons[f'{location} trucking electrolyzer capacity'] = electrolyzer_capacities
         hexagons[f'{location} trucking battery capacity'] = battery_capacities
         hexagons[f'{location} trucking H2 storage capacity'] = h2_storages
-        # save trucking LCOH
         hexagons[f'{location} trucking production cost'] = lcohs_trucking
 
-        print(str(trucking_time) + ' s')
+        print(f"Trucking optimization for {location} completed in {trucking_time} s")
 
-        # calculate cost of production for pipeline demand profile
+        # Pipeline optimization
         lcohs_pipeline = np.zeros(len(pv_profile.hexagon))
-        solar_capacities= np.zeros(len(pv_profile.hexagon))
-        wind_capacities= np.zeros(len(pv_profile.hexagon))
-        hydro_capacities= np.zeros(len(pv_profile.hexagon))
-        electrolyzer_capacities= np.zeros(len(pv_profile.hexagon))
+        solar_capacities = np.zeros(len(pv_profile.hexagon))
+        wind_capacities = np.zeros(len(pv_profile.hexagon))
+        hydro_capacities = np.zeros(len(pv_profile.hexagon))
+        electrolyzer_capacities = np.zeros(len(pv_profile.hexagon))
         battery_capacities = np.zeros(len(pv_profile.hexagon))
-        h2_storages= np.zeros(len(pv_profile.hexagon))
+        h2_storages = np.zeros(len(pv_profile.hexagon))
         start = time.process_time()
-        for hexagon in pv_profile.hexagon.data:
-            hydrogen_demand_trucking, hydrogen_demand_pipeline = demand_schedule(
-                demand_parameters.loc[location,'Annual demand [kg/a]'],
-                hexagons.loc[hexagon,f'{location} trucking state'],
-                transport_excel_path,
-                weather_excel_path)
-            country_series = country_parameters.loc[hexagons.country[hexagon]]
-            lcoh, wind_capacity, solar_capacity, hydro_capacity, electrolyzer_capacity, battery_capacity, h2_storage =\
-                optimize_hydrogen_plant(wind_profile.sel(hexagon = hexagon),
-                                    pv_profile.sel(hexagon = hexagon),
-                                    hydro_profile.sel(hexagon = hexagon),
-                                    wind_profile.time,
-                                    hydrogen_demand_pipeline,
-                                    hexagons.loc[hexagon,'theo_turbines'],
-                                    hexagons.loc[hexagon,'theo_pv'],
-                                    hexagons.loc[hexagon,'hydro'],
-                                    country_series,
-                                    # water_limit = hexagons.loc[hexagon,'delta_water_m3'],
-                                    )
-            lcohs_pipeline[hexagon]=lcoh
-            solar_capacities[hexagon] = solar_capacity
-            wind_capacities[hexagon] = wind_capacity
-            hydro_capacities[hexagon] = hydro_capacity
-            electrolyzer_capacities[hexagon] = electrolyzer_capacity
-            battery_capacities[hexagon] = battery_capacity
-            h2_storages[hexagon] = h2_storage
-        pipeline_time = time.process_time()-start
-        print(str(pipeline_time) + ' s')
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(optimize_hexagon_pipeline, hexagon, location, demand_parameters, hexagons, 
+                                       transport_excel_path, weather_excel_path, country_parameters, wind_profile, 
+                                       pv_profile, hydro_profile): hexagon 
+                       for hexagon in pv_profile.hexagon.data}
+
+            total_hexagons = len(futures)
+            completed_hexagons = 0
+
+            for future in as_completed(futures):
+                hexagon = futures[future]
+                try:
+                    hexagon, lcoh, wind_capacity, solar_capacity, hydro_capacity, electrolyzer_capacity, battery_capacity, h2_storage = future.result()
+                    
+                    lcohs_pipeline[hexagon] = lcoh
+                    solar_capacities[hexagon] = solar_capacity
+                    wind_capacities[hexagon] = wind_capacity
+                    hydro_capacities[hexagon] = hydro_capacity
+                    electrolyzer_capacities[hexagon] = electrolyzer_capacity
+                    battery_capacities[hexagon] = battery_capacity
+                    h2_storages[hexagon] = h2_storage
+
+                except Exception as e:
+                    print(f"Hexagon {hexagon} generated an exception: {e}")
+                
+                completed_hexagons += 1
+                display_progress(completed_hexagons, total_hexagons, prefix='Pipeline Progress:', suffix='Complete')
+
+
+        pipeline_time = time.process_time() - start
 
         hexagons[f'{location} pipeline solar capacity'] = solar_capacities
         hexagons[f'{location} pipeline wind capacity'] = wind_capacities
-        hexagons[f'{location} trucking hydro capacity'] = hydro_capacities
+        hexagons[f'{location} pipeline hydro capacity'] = hydro_capacities
         hexagons[f'{location} pipeline electrolyzer capacity'] = electrolyzer_capacities
         hexagons[f'{location} pipeline battery capacity'] = battery_capacities
         hexagons[f'{location} pipeline H2 storage capacity'] = h2_storages
-
-        # add optimal LCOH for each hexagon to hexagon file
         hexagons[f'{location} pipeline production cost'] = lcohs_pipeline
 
-    hexagons.to_file('Resources/hex_lcoh.geojson', driver='GeoJSON', encoding='utf-8')
+        print(f"Pipeline optimization for {location} completed in {pipeline_time} s")
 
+    hexagons.to_file('Resources/hex_lcoh.geojson', driver='GeoJSON', encoding='utf-8')
