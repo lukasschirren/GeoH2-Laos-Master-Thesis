@@ -380,11 +380,10 @@ def optimize_hydrogen_plant(wind_potential, pv_potential, hydro_potential, times
 
     # Solve the model
     solver = 'gurobi'
-    n.lopf(solver_name=solver,
-           solver_options = {'LogToConsole':0, 'OutputFlag':0, 'LogFile': ''},
+    n.optimize(solver_name=solver,
+           solver_options={'LogToConsole': 0, 'OutputFlag': 0, 'LogFile': ''},
            pyomo=False,
-           extra_functionality=aux.extra_functionalities,
-           )
+           extra_functionality=aux.extra_functionalities)
     # Output results
 
     lcoh = n.objective/(n.loads_t.p_set.sum().iloc[0]/39.4*1000) # convert back to kg H2
@@ -394,7 +393,7 @@ def optimize_hydrogen_plant(wind_potential, pv_potential, hydro_potential, times
     electrolyzer_capacity = n.links.p_nom_opt['Electrolysis']
     battery_capacity = n.storage_units.p_nom_opt['Battery']
     h2_storage = n.stores.e_nom_opt['Compressed H2 Store']
-    print(lcoh)
+    print(f"\n{lcoh:.2f}")
     return lcoh, wind_capacity, solar_capacity, hydro_capacity, electrolyzer_capacity, battery_capacity, h2_storage
 
 
