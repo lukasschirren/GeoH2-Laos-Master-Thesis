@@ -25,10 +25,10 @@ import time
 import xarray as xr
 from scipy.constants import physical_constants
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import warnings
+# import warnings
 
-# Suppress warnings
-warnings.filterwarnings("ignore")
+# # Suppress warnings
+# warnings.filterwarnings("ignore")
 
 logging.basicConfig(level=logging.ERROR)
 
@@ -130,10 +130,10 @@ def demand_schedule(quantity, transport_state, transport_excel_path,
     quantity_per_delivery = quantity/annual_deliveries
     index = pd.date_range(start_date, end_date, periods=annual_deliveries)
     trucking_demand_schedule = pd.DataFrame(quantity_per_delivery, index=index, columns = ['Demand'])
-    trucking_hourly_demand_schedule = trucking_demand_schedule.resample('h').sum().fillna(0.)
+    trucking_hourly_demand_schedule = trucking_demand_schedule.resample('H').sum().fillna(0.)
 
     # schedule for pipeline
-    index = pd.date_range(start_date, end_date, freq = 'h')
+    index = pd.date_range(start_date, end_date, freq = 'H')
     pipeline_hourly_quantity = quantity/index.size
     pipeline_hourly_demand_schedule = pd.DataFrame(pipeline_hourly_quantity, index=index,  columns = ['Demand'])
 
@@ -294,6 +294,8 @@ def optimize_hydrogen_plant(wind_potential, pv_potential, hydro_potential, times
         1D dataarray of per-unit wind potential in hexagon.
     pv_potential : xarray DataArray
         1D dataarray of per-unit solar potential in hexagon.
+    hydro_potential : xarray DataArray
+        1D dataarray of per-unit hydro potential in hexagon.
     times : xarray DataArray
         1D dataarray with timestamps for wind and solar potential.
     demand_profile : pandas DataFrame
@@ -311,6 +313,8 @@ def optimize_hydrogen_plant(wind_potential, pv_potential, hydro_potential, times
         optimal wind capacity in MW.
     solar_capacity: float
         optimal solar capacity in MW.
+    hydro_capacity: float
+        optimal hydro capacity in MW.
     electrolyzer_capacity: float
         optimal electrolyzer capacity in MW.
     battery_capacity: float
@@ -414,7 +418,6 @@ if __name__ == "__main__":
     weather_filename = weather_parameters['Filename']
 
     hexagons = gpd.read_file('Resources/hex_transport.geojson')
-    hexagons['hydro'] = hexagons['hydro'].fillna(0)
     # !!! change to name of cutout in weather
     cutout = atlite.Cutout('Cutouts/' + weather_filename +'.nc')
     layout = cutout.uniform_layout()
