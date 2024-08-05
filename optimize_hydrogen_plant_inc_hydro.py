@@ -91,6 +91,8 @@ def hydropower_potential_with_capacity(flowrate, head, capacity, eta):
 
 #########################################################################################################
 
+# Sizing of electrolysers will need to be based on the average excess electricity available in each time slice
+# Input: Minimum load factor of the elctrolyser
 def demand_schedule(quantity, transport_state, transport_excel_path,
                              weather_excel_path):
     '''
@@ -125,6 +127,7 @@ def demand_schedule(quantity, transport_state, transport_excel_path,
     start_date = weather_parameters['Start date']
     end_date = weather_parameters['End date (not inclusive)']
 
+    # Adjust capacity based on excess
     # schedule for trucking
     annual_deliveries = quantity/truck_capacity
     quantity_per_delivery = quantity/annual_deliveries
