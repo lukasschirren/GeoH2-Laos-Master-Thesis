@@ -123,8 +123,8 @@ for d in demand_center_list.index:
             # !!! where are the 0.03 values coming from? it's the cost of heat in unknown units
                 local_conversion_cost = h2_conversion_stand(demand_state+'_load',
                                                             hydrogen_quantity,
-                                                            country_parameters.loc['Electricity price (euros/kWh)',hexagon.country[i]],
-                                                            country_parameters.loc['Heat price (euros/kWh)',hexagon.country[i]],
+                                                            country_parameters.loc['Electricity price (USD/kWh)',hexagon.country[i]],
+                                                            country_parameters.loc['Heat price (USD/kWh)',hexagon.country[i]],
                                                             country_parameters.loc[hexagon['country'][i],'Plant interest rate']
                                                             )[2]/hydrogen_quantity
                 
@@ -133,8 +133,8 @@ for d in demand_center_list.index:
             else:
                 local_conversion_cost = h2_conversion_stand(demand_state,
                                      hydrogen_quantity,
-                                     country_parameters.loc['Electricity price (euros/kWh)',hexagon.country[i]],
-                                     country_parameters.loc['Heat price (euros/kWh)',hexagon.country[i]],
+                                     country_parameters.loc['Electricity price (USD/kWh)',hexagon.country[i]],
+                                     country_parameters.loc['Heat price (USD/kWh)',hexagon.country[i]],
                                      country_parameters.loc[hexagon['country'][i],'Plant interest rate']
                                      )[2]/hydrogen_quantity
                 trucking_costs.append(local_conversion_cost)
@@ -160,10 +160,10 @@ for d in demand_center_list.index:
             trucking_cost, trucking_state = cheapest_trucking_strategy(demand_state,
                                                                        hydrogen_quantity,
                                                                        distance_to_demand[i],
-                                                                       country_parameters.loc[hexagon.country[i],'Electricity price (euros/kWh)'],
-                                                                       country_parameters.loc[hexagon.country[i],'Heat price (euros/kWh)'],
+                                                                       country_parameters.loc[hexagon.country[i],'Electricity price (USD/kWh)'],
+                                                                       country_parameters.loc[hexagon.country[i],'Heat price (USD/kWh)'],
                                                                        country_parameters.loc[hexagon['country'][i],'Infrastructure interest rate'],
-                                                                       country_parameters.loc[hexagon.country[demand_fid],'Electricity price (euros/kWh)'],
+                                                                       country_parameters.loc[hexagon.country[demand_fid],'Electricity price (USD/kWh)'],
                                                                        )
             trucking_costs[i] = trucking_cost
             trucking_states[i] = trucking_state
@@ -172,10 +172,10 @@ for d in demand_center_list.index:
             trucking_cost, trucking_state = cheapest_trucking_strategy(demand_state,
                                                                        hydrogen_quantity,
                                                                        distance_to_demand[i],
-                                                                       country_parameters.loc[hexagon.country[i],'Electricity price (euros/kWh)'],
-                                                                       country_parameters.loc[hexagon.country[i],'Heat price (euros/kWh)'],
+                                                                       country_parameters.loc[hexagon.country[i],'Electricity price (USD/kWh)'],
+                                                                       country_parameters.loc[hexagon.country[i],'Heat price (USD/kWh)'],
                                                                        country_parameters.loc[hexagon['country'][i],'Infrastructure interest rate'],
-                                                                       country_parameters.loc[hexagon.country[demand_fid],'Electricity price (euros/kWh)'],
+                                                                       country_parameters.loc[hexagon.country[demand_fid],'Electricity price (USD/kWh)'],
                                                                        )
             trucking_costs[i] = trucking_cost
             trucking_states[i] = trucking_state
@@ -189,10 +189,10 @@ for d in demand_center_list.index:
             pipeline_cost, pipeline_type = cheapest_pipeline_strategy(demand_state,
                                                                       hydrogen_quantity,
                                                                       distance_to_demand[i],
-                                                                    country_parameters.loc[hexagon.country[i],'Electricity price (euros/kWh)'],
-                                                                    country_parameters.loc[hexagon.country[i],'Heat price (euros/kWh)'],
+                                                                    country_parameters.loc[hexagon.country[i],'Electricity price (USD/kWh)'],
+                                                                    country_parameters.loc[hexagon.country[i],'Heat price (USD/kWh)'],
                                                                     country_parameters.loc[hexagon['country'][i],'Infrastructure interest rate'],
-                                                                    country_parameters.loc[hexagon.country[demand_fid],'Electricity price (euros/kWh)'],
+                                                                    country_parameters.loc[hexagon.country[demand_fid],'Electricity price (USD/kWh)'],
                                                                       )
             pipeline_costs[i] = pipeline_cost
         else:

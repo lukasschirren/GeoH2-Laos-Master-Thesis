@@ -34,8 +34,8 @@ h2o_costs = np.empty(len(hexagons))
 electricity_demand_h2o_treatment = water_data['Freshwater treatment electricity demand (kWh/m3)']
 # Remove ocen water costs (landlocked)
 electricity_demand_h2o_ocean_treatment = water_data['Ocean water treatment electricity demand (kWh/m3)']
-water_transport_costs = water_data['Water transport cost (euros/100 km/m3)']
-water_spec_cost = water_data['Water specific cost (euros/m3)']
+water_transport_costs = water_data['Water transport cost (USD/100 km/m3)']
+water_spec_cost = water_data['Water specific cost (USD/m3)']
 water_demand = water_data['Water demand  (L/kg H2)']
 
 for i in range(len(hexagons)):
@@ -43,12 +43,12 @@ for i in range(len(hexagons)):
                                         + (water_transport_costs/100)*min(hexagons['waterbody_dist'][i],
                                                                           hexagons['waterway_dist'][i]) 
                                         + electricity_demand_h2o_treatment*\
-                                            country_parameters.loc[hexagons.country[i],'Electricity price (euros/kWh)']
+                                            country_parameters.loc[hexagons.country[i],'Electricity price (USD/kWh)']
                                         )*water_demand/1000
     h2o_costs_ocean[i] =(water_spec_cost 
                              #+ (water_transport_costs/100)*hexagons['ocean_dist'][i] 
                              + electricity_demand_h2o_ocean_treatment*\
-                                 country_parameters.loc[hexagons.country[i],'Electricity price (euros/kWh)']
+                                 country_parameters.loc[hexagons.country[i],'Electricity price (USD/kWh)']
                              )*water_demand/1000
     h2o_costs[i] = min(h2o_costs_dom_water_bodies[i],h2o_costs_ocean[i])
 

@@ -58,17 +58,17 @@ def trucking_costs(transport_state, distance, quantity, interest, excel_path):
 
     average_truck_speed = transport_parameters['Average truck speed (km/h)']                #km/h
     working_hours = transport_parameters['Working hours (h/day)']                     #h/day
-    diesel_price = transport_parameters['Diesel price (euros/L)']                    #€/l
-    costs_for_driver = transport_parameters['Costs for driver (euros/h)']                  #€/h
+    diesel_price = transport_parameters['Diesel price (USD/L)']                    #€/l
+    costs_for_driver = transport_parameters['Costs for driver (USD/h)']                  #€/h
     working_days = transport_parameters['Working days (per year)']                      #per year
     max_driving_dist = transport_parameters['Max driving distance (km/a)']               #km/a Maximum driving distance per truck per year
 
-    spec_capex_truck = transport_parameters['Spec capex truck (euros)']               #€
+    spec_capex_truck = transport_parameters['Spec capex truck (USD)']               #€
     spec_opex_truck = transport_parameters['Spec opex truck (% of capex/a)']                  #% of CAPEX/a
     diesel_consumption = transport_parameters['Diesel consumption (L/100 km)']                 #l/100km
     truck_lifetime = transport_parameters['Truck lifetime (a)']                      #a
 
-    spec_capex_trailor = transport_parameters['Spec capex trailer (euros)']
+    spec_capex_trailor = transport_parameters['Spec capex trailer (USD)']
     spec_opex_trailor =transport_parameters['Spec opex trailer (% of capex/a)']
     net_capacity = transport_parameters['Net capacity (kg H2)']                     #kgh2
     trailor_lifetime = transport_parameters['Trailer lifetime (a)']                   #a
@@ -155,7 +155,7 @@ def h2_conversion_stand(final_state, quantity, electricity_costs, heat_costs, in
         n_isentrop = conversion_parameters['Isentropic efficiency']
                     
         compressor_lifetime = conversion_parameters['Compressor lifetime (a)']
-        capex_coefficient = conversion_parameters['Compressor capex coefficient (euros per kilograms H2 per day)']
+        capex_coefficient = conversion_parameters['Compressor capex coefficient (USD per kilograms H2 per day)']
         opex_compressor = conversion_parameters['Compressor opex (% capex)']
 
         elec_demand_per_kg_h2 = (cp*Tein*(((500/pein)**((k-1)/k))-1))/n_isentrop          #kWh/kgh2
@@ -174,9 +174,9 @@ def h2_conversion_stand(final_state, quantity, electricity_costs, heat_costs, in
     elif final_state == 'LH2':
 
         electricity_unit_demand = conversion_parameters['Electricity demand (kWh per kg H2)']
-        capex_quadratic_coefficient = conversion_parameters['Capex quadratic coefficient (euros (kg H2)-2)']
-        capex_linear_coefficient = conversion_parameters['Capex linear coefficient (euros per kg H2)']
-        capex_constant = conversion_parameters['Capex constant (euros)']
+        capex_quadratic_coefficient = conversion_parameters['Capex quadratic coefficient (USD (kg H2)-2)']
+        capex_linear_coefficient = conversion_parameters['Capex linear coefficient (USD per kg H2)']
+        capex_constant = conversion_parameters['Capex constant (USD)']
         opex_liquid_plant = conversion_parameters['Opex (% of capex)']
         liquid_plant_lifetime = conversion_parameters['Plant lifetime (a)']
         
@@ -196,10 +196,10 @@ def h2_conversion_stand(final_state, quantity, electricity_costs, heat_costs, in
  
         electricity_unit_demand = conversion_parameters['Electricity demand (kWh per kg H2)']
         heat_unit_demand = conversion_parameters['Heat demand (kWh per kg H2)']
-        capex_coefficient = conversion_parameters['Capex coefficient (euros per kilograms H2 per year)']
+        capex_coefficient = conversion_parameters['Capex coefficient (USD per kilograms H2 per year)']
         opex_hydrogenation = conversion_parameters['Opex (% of capex)']
         hydrogenation_lifetime = conversion_parameters['Hydrogenation lifetime (a)']
-        costs_carrier = conversion_parameters['Carrier costs (euros per kg carrier)']                                                      #€/kg_carrier       https://www.hydrogenious.net/index.php/en/2020/07/21/lohc-global-hydrogen-opportunity/#:~:text=carbon%20hydrogen%20transportation.-,Source%3A%20Hydrogenious%20LOHC%20Technologies.,hydrogen%20cost%20of%20%242.54%2Fkg
+        costs_carrier = conversion_parameters['Carrier costs (USD per kg carrier)']                                                      #€/kg_carrier       https://www.hydrogenious.net/index.php/en/2020/07/21/lohc-global-hydrogen-opportunity/#:~:text=carbon%20hydrogen%20transportation.-,Source%3A%20Hydrogenious%20LOHC%20Technologies.,hydrogen%20cost%20of%20%242.54%2Fkg
         ratio_carrier = conversion_parameters['Carrier ratio (kg carrier: kg hydrogen)']
         
         elec_demand = electricity_unit_demand * quantity 
@@ -218,7 +218,7 @@ def h2_conversion_stand(final_state, quantity, electricity_costs, heat_costs, in
 
         electricity_unit_demand = conversion_parameters['Electricity demand (kWh per kg H2)']
         heat_unit_demand = conversion_parameters['Heat demand (kWh per kg H2)']
-        capex_coefficient = conversion_parameters['Capex coefficient (euros per kilograms H2 per year)']
+        capex_coefficient = conversion_parameters['Capex coefficient (USD per kilograms H2 per year)']
         opex_dehydrogenation = conversion_parameters['Opex (% of capex)']
         dehydrogenation_lifetime = conversion_parameters['Hydrogenation lifetime (a)']
         
@@ -237,7 +237,7 @@ def h2_conversion_stand(final_state, quantity, electricity_costs, heat_costs, in
 
         electricity_unit_demand = conversion_parameters['Electricity demand (kWh per kg H2)']
         heat_unit_demand = conversion_parameters['Heat demand (kWh per kg H2)']
-        capex_coefficient = conversion_parameters['Capex coefficient (euros per annual g H2)']
+        capex_coefficient = conversion_parameters['Capex coefficient (USD per annual g H2)']
         opex_NH3_plant = conversion_parameters['Opex (% of capex)']
         NH3_plant_lifetime =conversion_parameters['Plant lifetime (a)']
         
@@ -257,7 +257,7 @@ def h2_conversion_stand(final_state, quantity, electricity_costs, heat_costs, in
 
         electricity_unit_demand = conversion_parameters['Electricity demand (kWh per kg H2)']
         heat_unit_demand = conversion_parameters['Heat demand (kWh per kg H2)']
-        capex_coefficient = conversion_parameters['Capex coefficient (euros per hourly g H2)']
+        capex_coefficient = conversion_parameters['Capex coefficient (USD per hourly g H2)']
         opex_NH3_plant = conversion_parameters['Opex (% of capex)']
         NH3_plant_lifetime = conversion_parameters['Plant lifetime (a)']
         
@@ -426,7 +426,7 @@ def pipeline_costs(distance,quantity,elec_cost,interest):
     quantity : float
         annual quantity of hydrogen demanded in kg.
     elec_cost : float
-        price of electricity along pipeline in euros.
+        price of electricity along pipeline in USD.
     interest : float
         interest rate on capital investments.
 
@@ -471,8 +471,8 @@ def pipeline_costs(distance,quantity,elec_cost,interest):
                                    sheet_name=pipeline_type,
                                     index_col = 'Parameter'
                                     ).squeeze('columns')
-    capex_pipeline = pipeline_parameters['Pipeline capex (euros)']
-    capex_compressor = pipeline_parameters['Compressor capex (euros)']
+    capex_pipeline = pipeline_parameters['Pipeline capex (USD)']
+    capex_compressor = pipeline_parameters['Compressor capex (USD)']
     
     capex_annual = ((capex_pipeline*distance)*CRF(interest,lifetime_pipeline))\
         + ((capex_compressor*distance)*CRF(interest,lifetime_compressors))

@@ -24,7 +24,9 @@ import time
 
 import xarray as xr
 from scipy.constants import physical_constants
-from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# from concurrent.futures import ThreadPoolExecutor, as_completed
+from joblib import Parallel, delayed
 # import warnings
 
 # # Suppress warnings
@@ -32,6 +34,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logging.basicConfig(level=logging.ERROR)
 
+
+def worker(hexagon, location, demand_parameters, hexagons, transport_excel_path, weather_excel_path,
+           country_parameters, wind_profile, pv_profile, hydro_profile):
+    try:
+        return optimize_hexagon_trucking(hexagon, location, demand_parameters, 
+                                         hexagons, transport_excel_path, weather_excel_path, 
+                                         country_parameters, wind_profile, pv_profile, hydro_profile)
+    except Exception as e:
+        print(f"Hexagon {hexagon} generated an exception: {e}")
+        return hexagon, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
 
 def display_progress(iteration, total, prefix='', suffix=''):
     """
@@ -527,34 +539,31 @@ if __name__ == "__main__":
         h2_storages = np.zeros(len(pv_profile.hexagon))
         start = time.process_time()
 
+        # Initialize completed_hexagons
+        completed_hexagons = 0
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(optimize_hexagon_trucking, hexagon, location, demand_parameters, hexagons, 
-                                       transport_excel_path, weather_excel_path, country_parameters, wind_profile, 
-                                       pv_profile, hydro_profile): hexagon 
-                       for hexagon in pv_profile.hexagon.data}
+        # Specify the number of workers (e.g., 4 cores)
+        n_jobs = 10
 
-            total_hexagons = len(futures)
-            completed_hexagons = 0
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(worker)(hexagon, location, demand_parameters, hexagons, transport_excel_path, weather_excel_path, 
+                            country_parameters, wind_profile, pv_profile, hydro_profile)
+            for hexagon in pv_profile.hexagon.data
+        )
 
-            for future in as_completed(futures):
-                hexagon = futures[future]
-                try:
-                    hexagon, lcoh, wind_capacity, solar_capacity, hydro_capacity, electrolyzer_capacity, battery_capacity, h2_storage = future.result()
-                    
-                    lcohs_trucking[hexagon] = lcoh
-                    solar_capacities[hexagon] = solar_capacity
-                    wind_capacities[hexagon] = wind_capacity
-                    hydro_capacities[hexagon] = hydro_capacity
-                    electrolyzer_capacities[hexagon] = electrolyzer_capacity
-                    battery_capacities[hexagon] = battery_capacity
-                    h2_storages[hexagon] = h2_storage
+        # Process the results
+        for hexagon, lcoh, wind_capacity, solar_capacity, hydro_capacity, electrolyzer_capacity, battery_capacity, h2_storage in results:
+            lcohs_trucking[hexagon] = lcoh
+            solar_capacities[hexagon] = solar_capacity
+            wind_capacities[hexagon] = wind_capacity
+            hydro_capacities[hexagon] = hydro_capacity
+            electrolyzer_capacities[hexagon] = electrolyzer_capacity
+            battery_capacities[hexagon] = battery_capacity
+            h2_storages[hexagon] = h2_storage
+            
+            completed_hexagons += 1
+            display_progress(completed_hexagons, len(results), prefix='Pipeline Progress:', suffix='Complete')
 
-                except Exception as e:
-                    print(f"Hexagon {hexagon} generated an exception: {e}")
-                
-                completed_hexagons += 1
-                display_progress(completed_hexagons, total_hexagons, prefix='Pipeline Progress:', suffix='Complete')
 
         trucking_time = time.process_time() - start
 
@@ -568,55 +577,55 @@ if __name__ == "__main__":
 
         print(f"Trucking optimization for {location} completed in {trucking_time} s")
 
-        # Pipeline optimization
-        lcohs_pipeline = np.zeros(len(pv_profile.hexagon))
-        solar_capacities = np.zeros(len(pv_profile.hexagon))
-        wind_capacities = np.zeros(len(pv_profile.hexagon))
-        hydro_capacities = np.zeros(len(pv_profile.hexagon))
-        electrolyzer_capacities = np.zeros(len(pv_profile.hexagon))
-        battery_capacities = np.zeros(len(pv_profile.hexagon))
-        h2_storages = np.zeros(len(pv_profile.hexagon))
-        start = time.process_time()
+        # # Pipeline optimization
+        # lcohs_pipeline = np.zeros(len(pv_profile.hexagon))
+        # solar_capacities = np.zeros(len(pv_profile.hexagon))
+        # wind_capacities = np.zeros(len(pv_profile.hexagon))
+        # hydro_capacities = np.zeros(len(pv_profile.hexagon))
+        # electrolyzer_capacities = np.zeros(len(pv_profile.hexagon))
+        # battery_capacities = np.zeros(len(pv_profile.hexagon))
+        # h2_storages = np.zeros(len(pv_profile.hexagon))
+        # start = time.process_time()
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(optimize_hexagon_pipeline, hexagon, location, demand_parameters, hexagons, 
-                                       transport_excel_path, weather_excel_path, country_parameters, wind_profile, 
-                                       pv_profile, hydro_profile): hexagon 
-                       for hexagon in pv_profile.hexagon.data}
+        # with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        #     futures = {executor.submit(optimize_hexagon_pipeline, hexagon, location, demand_parameters, hexagons, 
+        #                                transport_excel_path, weather_excel_path, country_parameters, wind_profile, 
+        #                                pv_profile, hydro_profile): hexagon 
+        #                for hexagon in pv_profile.hexagon.data}
 
-            total_hexagons = len(futures)
-            completed_hexagons = 0
+        #     total_hexagons = len(futures)
+        #     completed_hexagons = 0
 
-            for future in as_completed(futures):
-                hexagon = futures[future]
-                try:
-                    hexagon, lcoh, wind_capacity, solar_capacity, hydro_capacity, electrolyzer_capacity, battery_capacity, h2_storage = future.result()
+        #     for future in as_completed(futures):
+        #         hexagon = futures[future]
+        #         try:
+        #             hexagon, lcoh, wind_capacity, solar_capacity, hydro_capacity, electrolyzer_capacity, battery_capacity, h2_storage = future.result()
                     
-                    lcohs_pipeline[hexagon] = lcoh
-                    solar_capacities[hexagon] = solar_capacity
-                    wind_capacities[hexagon] = wind_capacity
-                    hydro_capacities[hexagon] = hydro_capacity
-                    electrolyzer_capacities[hexagon] = electrolyzer_capacity
-                    battery_capacities[hexagon] = battery_capacity
-                    h2_storages[hexagon] = h2_storage
+        #             lcohs_pipeline[hexagon] = lcoh
+        #             solar_capacities[hexagon] = solar_capacity
+        #             wind_capacities[hexagon] = wind_capacity
+        #             hydro_capacities[hexagon] = hydro_capacity
+        #             electrolyzer_capacities[hexagon] = electrolyzer_capacity
+        #             battery_capacities[hexagon] = battery_capacity
+        #             h2_storages[hexagon] = h2_storage
 
-                except Exception as e:
-                    print(f"Hexagon {hexagon} generated an exception: {e}")
+        #         except Exception as e:
+        #             print(f"Hexagon {hexagon} generated an exception: {e}")
                 
-                completed_hexagons += 1
-                display_progress(completed_hexagons, total_hexagons, prefix='Pipeline Progress:', suffix='Complete')
+        #         completed_hexagons += 1
+        #         display_progress(completed_hexagons, total_hexagons, prefix='Pipeline Progress:', suffix='Complete')
 
 
-        pipeline_time = time.process_time() - start
+        # pipeline_time = time.process_time() - start
 
-        hexagons[f'{location} pipeline solar capacity'] = solar_capacities
-        hexagons[f'{location} pipeline wind capacity'] = wind_capacities
-        hexagons[f'{location} pipeline hydro capacity'] = hydro_capacities
-        hexagons[f'{location} pipeline electrolyzer capacity'] = electrolyzer_capacities
-        hexagons[f'{location} pipeline battery capacity'] = battery_capacities
-        hexagons[f'{location} pipeline H2 storage capacity'] = h2_storages
-        hexagons[f'{location} pipeline production cost'] = lcohs_pipeline
+        # hexagons[f'{location} pipeline solar capacity'] = solar_capacities
+        # hexagons[f'{location} pipeline wind capacity'] = wind_capacities
+        # hexagons[f'{location} pipeline hydro capacity'] = hydro_capacities
+        # hexagons[f'{location} pipeline electrolyzer capacity'] = electrolyzer_capacities
+        # hexagons[f'{location} pipeline battery capacity'] = battery_capacities
+        # hexagons[f'{location} pipeline H2 storage capacity'] = h2_storages
+        # hexagons[f'{location} pipeline production cost'] = lcohs_pipeline
 
-        print(f"Pipeline optimization for {location} completed in {pipeline_time} s")
+        # print(f"Pipeline optimization for {location} completed in {pipeline_time} s")
 
     hexagons.to_file('Resources/hex_lcoh.geojson', driver='GeoJSON', encoding='utf-8')

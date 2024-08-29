@@ -49,7 +49,7 @@ for demand_center in demand_centers:
     
     # Get CRF and then cost for each component using the data for the country you are looking at
 
-    # Battery - pipeline 
+    # # Battery - pipeline 
     interest_battery = country_parameters.loc[country, 'Plant interest rate']
     lifetime_battery = country_parameters.loc[country, 'Plant lifetime (years)']
     crf_battery = functions.CRF(interest_battery, lifetime_battery)
@@ -69,7 +69,7 @@ for demand_center in demand_centers:
     hexagons[f'{demand_center} LCOH - trucking battery costs portion'] = \
         hexagons[f'{demand_center} trucking battery costs'] / demand_parameters.loc[demand_center, 'Annual demand [kg/a]']
 
-    # Electrolyzer - pipeline
+    # # Electrolyzer - pipeline
     interest_electrolyzer = country_parameters.loc[country, 'Plant interest rate']
     lifetime_electrolyzer = country_parameters.loc[country, 'Plant lifetime (years)']
     crf_electrolyzer = functions.CRF(interest_electrolyzer, lifetime_electrolyzer)
@@ -89,7 +89,7 @@ for demand_center in demand_centers:
     hexagons[f'{demand_center} LCOH - trucking electrolyzer portion'] = \
         hexagons[f'{demand_center} trucking electrolyzer costs'] / demand_parameters.loc[demand_center, 'Annual demand [kg/a]']
 
-    # H2 Storage - pipeline
+    # # H2 Storage - pipeline
     interest_h2_storage = country_parameters.loc[country, 'Plant interest rate']
     lifetime_h2_storage = country_parameters.loc[country, 'Plant lifetime (years)']
     crf_h2_storage = functions.CRF(interest_h2_storage, lifetime_h2_storage)

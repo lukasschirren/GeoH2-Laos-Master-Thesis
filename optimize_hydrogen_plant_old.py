@@ -136,7 +136,7 @@ def optimize_hydrogen_plant(wind_potential, pv_potential, times, demand_profile,
     n.set_snapshots(times)
 
     # Import the design of the H2 plant into the network
-    n.import_from_csv_folder("Parameters/Basic_H2_plant")
+    n.import_from_csv_folder("Parameters/Basic_H2_plant_old")
 
     # Import demand profile
     # Note: All flows are in MW or MWh, conversions for hydrogen done using HHVs. Hydrogen HHV = 39.4 MWh/t
@@ -152,8 +152,8 @@ def optimize_hydrogen_plant(wind_potential, pv_potential, times, demand_profile,
     n.generators_t.p_max_pu['Solar'] = pv_potential
 
     # specify maximum capacity based on land use
-    n.generators.loc['Wind','p_nom_max'] = wind_max_capacity
-    n.generators.loc['Solar','p_nom_max'] = pv_max_capacity
+    n.generators.loc['Wind','p_nom_max'] = wind_max_capacity * 2 # ADDING rated power - here 2 MW
+    n.generators.loc['Solar','p_nom_max'] = pv_max_capacity  * 1 # ADDING the power for each node - here 1 MW
 
     # specify technology-specific and country-specific WACC and lifetime here
     n.generators.loc['Wind','capital_cost'] = n.generators.loc['Wind','capital_cost']\

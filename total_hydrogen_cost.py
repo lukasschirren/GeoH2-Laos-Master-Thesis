@@ -29,15 +29,15 @@ for demand_center in demand_centers:
             +hexagons[f'{demand_center} trucking transport and conversion costs']\
                 +hexagons[f'{demand_center} trucking production cost']\
                     +hexagons['Lowest water cost']
-    hexagons[f'{demand_center} pipeline total cost'] =\
-            hexagons[f'{demand_center} pipeline transport and conversion costs']\
-                +hexagons[f'{demand_center} pipeline production cost']\
-                    +hexagons['Lowest water cost']
+    # hexagons[f'{demand_center} pipeline total cost'] =\
+    #         hexagons[f'{demand_center} pipeline transport and conversion costs']\
+    #             +hexagons[f'{demand_center} pipeline production cost']\
+    #                 +hexagons['Lowest water cost']
                     
-    for hexagon in hexagons.index:
-        hexagons.loc[hexagon,f'{demand_center} lowest cost'] = np.nanmin(
-            [hexagons.loc[hexagon,f'{demand_center} trucking total cost'],
-             hexagons.loc[hexagon,f'{demand_center} pipeline total cost']
-             ])
+    # for hexagon in hexagons.index:
+    #     hexagons.loc[hexagon,f'{demand_center} lowest cost'] = np.nanmin(
+    #         [hexagons.loc[hexagon,f'{demand_center} trucking total cost'],
+    #          hexagons.loc[hexagon,f'{demand_center} pipeline total cost']
+    #          ])
         
 hexagons.to_file('Resources/hex_total_cost.geojson', driver='GeoJSON', encoding='utf-8')
