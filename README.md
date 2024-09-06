@@ -1,3 +1,7 @@
+______
+A fantastic visualisation of the different analysed scenarios is in the folder 'Scenario_visual_html' in the form of HTML files, which can be opened in a web browser.
+______
+
 # GEOH2
 Geospatial analysis of hydrogen production costs
 
