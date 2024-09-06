@@ -202,7 +202,7 @@ def optimize_hydrogen_plant(wind_potential, pv_potential, hydro_potential, times
     n.set_snapshots(times)
 
     # Import the design of the H2 plant into the network
-    n.import_from_csv_folder("Parameters/Basic_H2_plant")
+    n.import_from_csv_folder("Parameters_2/Basic_H2_plant")
 
     # Import demand profile
     # Note: All flows are in MW or MWh, conversions for hydrogen done using HHVs. Hydrogen HHV = 39.4 MWh/t
@@ -254,12 +254,12 @@ def optimize_hydrogen_plant(wind_potential, pv_potential, hydro_potential, times
 
 
 if __name__ == "__main__":
-    transport_excel_path = "Parameters/transport_parameters.xlsx"
-    weather_excel_path = "Parameters/weather_parameters.xlsx"
-    country_excel_path = 'Parameters/country_parameters.xlsx'
+    transport_excel_path = "Parameters_2/transport_parameters.xlsx"
+    weather_excel_path = "Parameters_2/weather_parameters.xlsx"
+    country_excel_path = 'Parameters_2/country_parameters.xlsx'
     country_parameters = pd.read_excel(country_excel_path,
                                         index_col='Country')
-    demand_excel_path = 'Parameters/demand_parameters.xlsx'
+    demand_excel_path = 'Parameters_2/demand_parameters.xlsx'
     demand_parameters = pd.read_excel(demand_excel_path,
                                       index_col='Demand center',
                                       ).squeeze("columns")
@@ -430,7 +430,7 @@ if __name__ == "__main__":
         for hexagon in pv_profile.hexagon.data:
             _, hydrogen_demand_pipeline = demand_schedule(
                 demand_parameters.loc[location,'Annual demand [kg/a]'],
-                hexagons.loc[hexagon,f'{location} trucking state'],
+                hexagons.loc[hexagon,f'{location} pipeline state'],
                 transport_excel_path,
                 weather_excel_path)
             country_series = country_parameters.loc[hexagons.country[hexagon]]

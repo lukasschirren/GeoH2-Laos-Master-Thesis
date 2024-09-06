@@ -3,7 +3,7 @@ import subprocess
 import psutil
 
 # Replace with the actual PID of the process you want to monitor
-target_pid = 180 #33676  # Example PID, replace with the actual one
+target_pid = 9916  # Example PID, replace with the actual one
 
 # Function to check if the process is still running by PID
 def is_process_running(pid):
@@ -25,4 +25,4 @@ print("WOW!")
 # Run the scripts in the specified order
 run_script("assign_country.py")
 run_script("optimize_transport_and_conversion.py")
-run_script("optimize_hydrogen_plan_spatial.py")
+run_script("optimize_hydrogen_plant_temporal.py")

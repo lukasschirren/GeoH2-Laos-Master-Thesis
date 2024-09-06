@@ -205,5 +205,5 @@ for d in demand_center_list.index:
     hexagon[f'{d} pipeline transport and conversion costs'] = pipeline_costs # cost of supply conversion, pipeline transport, and demand conversion
 
 # Added force to UTF-8 encoding.
-hexagon.to_file('Resources/hex_transport.geojson', driver='GeoJSON', encoding='utf-8')
+hexagon.to_file('Parameters/hex_transport.geojson', driver='GeoJSON', encoding='utf-8')
 

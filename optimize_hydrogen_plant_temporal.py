@@ -269,7 +269,7 @@ if __name__ == "__main__":
                                        ).squeeze('columns')
     weather_filename = weather_parameters['Filename']
 
-    hexagons = gpd.read_file('Resources/hex_transport.geojson')
+    hexagons = gpd.read_file('Parameters/hex_transport.geojson')
     # !!! change to name of cutout in weather
     cutout = atlite.Cutout('Cutouts_23/' + weather_filename +'.nc')
     layout = cutout.uniform_layout()
@@ -332,7 +332,7 @@ if __name__ == "__main__":
         plants_in_hex = hydro_hex_mapping[hydro_hex_mapping['index_right'] == hex_index]['plant_index'].tolist()
         if len(plants_in_hex) > 0:
             hex_capacity_factor = capacity_factor.sel(plant=plants_in_hex)
-            plant_capacities = xr.DataArray(location_hydro.loc[plants_in_hex]['capacity'].values, dims=['plant'])
+            plant_capacities = xr.DataArray(location_hydro.loc[plants_in_hex]['Total capacity (MW)'].values, dims=['plant'])
 
             weights = plant_capacities / plant_capacities.sum()
             weighted_avg_capacity_factor = (hex_capacity_factor * weights).sum(dim='plant')
@@ -466,6 +466,6 @@ if __name__ == "__main__":
 
         print(f"Pipeline optimization for {location} completed in {pipeline_time} s")
 
-    hexagons.to_file('Resources/0Temporal/ratio_total/2030/hex_lcoh.geojson', driver='GeoJSON', encoding='utf-8')
+    hexagons.to_file('Resources/0Temporal/ratio_domestic/2022/hex_lcoh.geojson', driver='GeoJSON', encoding='utf-8')
     # hexagons.to_file('Resources/hex_lcoh_base_case.geojson', driver='GeoJSON', encoding='utf-8')
     

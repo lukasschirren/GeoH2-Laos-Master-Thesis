@@ -18,7 +18,7 @@ import functions
 import os
 
 year = '2022'
-base_path = 'Resources/0Temporal/ratio_total'
+base_path = 'Resources/0Temporal/ratio_domestic/'
 hex_file_name = 'hex_total_cost.geojson'
 
 # Construct the path
@@ -156,6 +156,27 @@ for demand_center in demand_centers:
         hexagons[f'{demand_center} trucking solar capacity'] * capital_cost_solar * crf_solar
     hexagons[f'{demand_center} LCOH - trucking solar portion'] = \
         hexagons[f'{demand_center} trucking solar costs'] / demand_parameters.loc[demand_center, 'Annual demand [kg/a]']
+        
+    # Hydro - pipeline
+    interest_hydro = country_parameters.loc[country, 'Hydro interest rate']
+    lifetime_hydro = country_parameters.loc[country, 'Hydro lifetime']
+    crf_hydro = functions.CRF(interest_hydro, lifetime_hydro)
+    capital_cost_hydro = generators_parameters.loc['Hydro', 'capital_cost']
+    hexagons[f'{demand_center} pipeline hydro costs'] = \
+        hexagons[f'{demand_center} pipeline hydro capacity'] * capital_cost_hydro * crf_hydro
+    hexagons[f'{demand_center} LCOH - pipeline hydro portion'] = \
+        hexagons[f'{demand_center} pipeline hydro costs'] / demand_parameters.loc[demand_center, 'Annual demand [kg/a]']
+        
+    
+    # Hydro - trucking
+    interest_hydro = country_parameters.loc[country, 'Hydro interest rate']
+    lifetime_hydro = country_parameters.loc[country, 'Hydro lifetime']
+    crf_hydro = functions.CRF(interest_hydro, lifetime_hydro)
+    capital_cost_hydro = generators_parameters.loc['Hydro', 'capital_cost']
+    hexagons[f'{demand_center} trucking hydro costs'] = \
+        hexagons[f'{demand_center} trucking hydro capacity'] * capital_cost_hydro * crf_hydro
+    hexagons[f'{demand_center} LCOH - trucking hydro portion'] = \
+        hexagons[f'{demand_center} trucking hydro costs'] / demand_parameters.loc[demand_center, 'Annual demand [kg/a]']
 
 
 

@@ -202,7 +202,7 @@ def optimize_hydrogen_plant(wind_potential, pv_potential, hydro_potential, times
     n.set_snapshots(times)
 
     # Import the design of the H2 plant into the network
-    n.import_from_csv_folder("Parameters/Basic_H2_plant")
+    n.import_from_csv_folder("Parameters_3/Basic_H2_plant")
 
     # Import demand profile
     # Note: All flows are in MW or MWh, conversions for hydrogen done using HHVs. Hydrogen HHV = 39.4 MWh/t
@@ -254,12 +254,12 @@ def optimize_hydrogen_plant(wind_potential, pv_potential, hydro_potential, times
 
 
 if __name__ == "__main__":
-    transport_excel_path = "Parameters/transport_parameters.xlsx"
-    weather_excel_path = "Parameters/weather_parameters.xlsx"
-    country_excel_path = 'Parameters/country_parameters.xlsx'
+    transport_excel_path = "Parameters_3/transport_parameters.xlsx"
+    weather_excel_path = "Parameters_3/weather_parameters.xlsx"
+    country_excel_path = 'Parameters_3/country_parameters.xlsx'
     country_parameters = pd.read_excel(country_excel_path,
                                         index_col='Country')
-    demand_excel_path = 'Parameters/demand_parameters.xlsx'
+    demand_excel_path = 'Parameters_3/demand_parameters.xlsx'
     demand_parameters = pd.read_excel(demand_excel_path,
                                       index_col='Demand center',
                                       ).squeeze("columns")
@@ -269,45 +269,70 @@ if __name__ == "__main__":
                                        ).squeeze('columns')
     weather_filename = weather_parameters['Filename']
 
-    hexagons = gpd.read_file('Resources/hex_transport.geojson')
+    hexagons = gpd.read_file('Parameters_3/hex_transport.geojson')
     # !!! change to name of cutout in weather
     cutout = atlite.Cutout('Cutouts_23/' + weather_filename +'.nc')
     layout = cutout.uniform_layout()
     
     ###############################################################
     # Added for hydropower
-    
-    location_hydro = gpd.read_file('Data/hydropower_dams.gpkg')
+    location_hydro = gpd.read_file('Data_3/hydropower_dams.gpkg')
     location_hydro.rename(columns={'Latitude': 'lat', 'Longitude': 'lon'}, inplace=True)
-    location_hydro.rename(columns={'head_example':'head'},inplace=True)
-    
-    laos_hydrobasins = gpd.read_file('hydrobasins_lvl10/hybas_as_lev10_v1c.shp')
-    laos_hydrobasins['lat'] = location_hydro.geometry.y
-    laos_hydrobasins['lon'] = location_hydro.geometry.x
-    
-    runoff = cutout.hydro(
-        plants=location_hydro,
-        hydrobasins= laos_hydrobasins,
-        per_unit=True                    # Normalize output per unit area
-    )
-    
-    eta = 0.75 # efficiency of hydropower plant
+    # Monthly generation columns
+    monthly_columns = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-    capacity_factor = xr.apply_ufunc(
-        hydropower_potential_with_capacity,
-        runoff,
-        xr.DataArray(location_hydro['head'].values, dims=['plant']),
-        xr.DataArray(location_hydro['capacity'].values, dims=['plant']),
-        eta,
-        vectorize=True,
-        dask='parallelized',  # Dask for parallel computation
-        output_dtypes=[float]
+    # Hours in each month for the year 2023
+    hours_in_month = {
+        'Jan': 744, 'Feb': 672, 'Mar': 744, 'Apr': 720,
+        'May': 744, 'Jun': 720, 'Jul': 744, 'Aug': 744,
+        'Sep': 720, 'Oct': 744, 'Nov': 720, 'Dec': 744
+    }
+
+    # Initialize an empty DataFrame to store hourly capacity factors
+    hourly_capacity_factors = pd.DataFrame()
+
+    
+    # Iterate over each plant
+    for index, row in location_hydro.iterrows():
+        plant_name = row['Name']
+        plant_capacity = row['Total capacity (MW)']
+        
+        # Generate an empty list to hold hourly capacity factors for the plant
+        plant_hourly_factors = []
+
+        # Spread the generation for each month evenly across the respective hours
+        for month in monthly_columns:
+            monthly_generation = row[month] * 1000  # Convert GWh to MWh
+            hourly_generation = monthly_generation / hours_in_month[month]  # MWh per hour
+            hourly_capacity_factor = hourly_generation / plant_capacity  # Capacity factor
+            
+            # Repeat this capacity factor for each hour of the month
+            plant_hourly_factors.extend([hourly_capacity_factor] * hours_in_month[month])
+
+        # Add the plant's hourly capacity factors to the DataFrame
+        hourly_capacity_factors[plant_name] = plant_hourly_factors
+
+
+    # Extend the data by adding the last hour's capacity factors for an additional 24 hours
+    last_hour = hourly_capacity_factors.iloc[-1]  # Get the last hour's data
+    extended_hours = pd.DataFrame([last_hour] * 24, columns=hourly_capacity_factors.columns)
+    hourly_capacity_factors = pd.concat([hourly_capacity_factors, extended_hours], ignore_index=True)
+
+    # Create a time index for the year 2023 plus the first hour of 2024
+    time_index = pd.date_range(start='2023-01-01', end='2024-01-01 23:00', freq='H')
+
+    # Ensure the time index matches the length of the DataFrame
+    hourly_capacity_factors.index = time_index
+    
+    # Convert the DataFrame to an xarray DataArray
+    capacity_factor_array = xr.DataArray(
+        data=hourly_capacity_factors.values,
+        dims=['time', 'plant'],
+        coords={'time': time_index, 'plant': location_hydro['Name'].values}
     )
     
     location_hydro['geometry'] = gpd.points_from_xy(location_hydro.lon, location_hydro.lat)
 
-
-    # Rename existing 'index_left' and 'index_right' columns if they exist
     if 'index_left' in location_hydro.columns:
         location_hydro = location_hydro.rename(columns={'index_left': 'index_left_renamed'})
     if 'index_right' in location_hydro.columns:
@@ -317,31 +342,41 @@ if __name__ == "__main__":
     if 'index_right' in hexagons.columns:
         hexagons = hexagons.rename(columns={'index_right': 'index_right_renamed'})
 
+    # Perform the spatial join
     hydro_hex_mapping = gpd.sjoin(location_hydro, hexagons, how='left', predicate='within')
+    hydro_hex_mapping = hydro_hex_mapping.drop_duplicates(subset=['Name'])
     hydro_hex_mapping['plant_index'] = hydro_hex_mapping.index
-    num_hexagons = len(hexagons)
-    num_time_steps = len(capacity_factor.time)
 
+    # Number of hexagons and time steps (from the capacity factor array)
+    num_hexagons = len(hexagons)
+    num_time_steps = len(capacity_factor_array.time)
+
+    # Initialize the final xarray DataArray to store capacity factors for each hexagon
     hydro_profile = xr.DataArray(
         data=np.zeros((num_hexagons, num_time_steps)),
         dims=['hexagon', 'time'],
-        coords={'hexagon': np.arange(num_hexagons), 'time': capacity_factor.time}
+        coords={'hexagon': np.arange(num_hexagons), 'time': capacity_factor_array.time}
     )
+    
+    # Ensure that plants_in_hex contains valid plant names
 
     for hex_index in range(num_hexagons):
-        plants_in_hex = hydro_hex_mapping[hydro_hex_mapping['index_right'] == hex_index]['plant_index'].tolist()
-        if len(plants_in_hex) > 0:
-            hex_capacity_factor = capacity_factor.sel(plant=plants_in_hex)
-            plant_capacities = xr.DataArray(location_hydro.loc[plants_in_hex]['capacity'].values, dims=['plant'])
+        plants_in_hex = hydro_hex_mapping[hydro_hex_mapping['index_right'] == hex_index]['Name'].tolist()
+        valid_plants_in_hex = [plant for plant in plants_in_hex if plant in capacity_factor_array['plant'].values]
 
+        if len(valid_plants_in_hex) > 0:
+            # Select the capacity factors for all plants in the current hexagon
+            hex_capacity_factors = capacity_factor_array.sel(plant=valid_plants_in_hex)
+                
+            # Get the capacities for these plants
+            plant_capacities = xr.DataArray(location_hydro.set_index('Name').loc[valid_plants_in_hex]['Total capacity (MW)'].values, dims=['plant'])
+
+            # Weighted average based on plant capacities
             weights = plant_capacities / plant_capacities.sum()
-            weighted_avg_capacity_factor = (hex_capacity_factor * weights).sum(dim='plant')
-            hydro_profile.loc[hex_index] = weighted_avg_capacity_factor
+            weighted_avg_capacity_factor = (hex_capacity_factors * weights).sum(dim='plant')
             
-            # hex_capacity_factor = capacity_factor.sel(plant=plants_in_hex)
-            # average_capacity_factor = hex_capacity_factor.mean(dim='plant')
-            # hydro_profile.loc[hex_index] = average_capacity_factor
-
+            # Store the result in the hydro_profile array
+            hydro_profile.loc[hex_index] = weighted_avg_capacity_factor    
     ###############################################################
 
     pv_profile = cutout.pv(
@@ -446,7 +481,7 @@ if __name__ == "__main__":
                                     country_series,
                                     # water_limit = hexagons.loc[hexagon,'delta_water_m3']
                                     )
-            lcohs_trucking[hexagon] = lcoh
+            lcohs_pipeline[hexagon] = lcoh
             solar_capacities[hexagon] = solar_capacity
             wind_capacities[hexagon] = wind_capacity
             hydro_capacities[hexagon] = hydro_capacity
@@ -466,6 +501,6 @@ if __name__ == "__main__":
 
         print(f"Pipeline optimization for {location} completed in {pipeline_time} s")
 
-    hexagons.to_file('Resources/0Temporal/ratio_total/2030/hex_lcoh.geojson', driver='GeoJSON', encoding='utf-8')
+    hexagons.to_file('Resources/0Seasonality/2019/hex_lcoh.geojson', driver='GeoJSON', encoding='utf-8')
     # hexagons.to_file('Resources/hex_lcoh_base_case.geojson', driver='GeoJSON', encoding='utf-8')
     
