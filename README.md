@@ -1,6 +1,8 @@
 ______
 A fantastic visualisation of the different analysed scenarios is in the folder 'Scenario_visual_html' in the form of HTML files, which can be opened in a web browser.
 
+This work was partially funded by the Climate-Compatible Growth Programme (CCG). CCG is funded by UK aid from the UK government. However, the views expressed herein do not necessarily reflect the UK government's official policies
+
 The orginial repository is cited at the end. 
 ______
 
