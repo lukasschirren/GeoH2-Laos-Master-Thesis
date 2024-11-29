@@ -1,7 +1,9 @@
 __pycache__/
 .venv/
 Data/
+hybas_as_lev12_v1c/
 hydrobasins_lvl10/
+hybas_eu_lev12_v1c
 Cutouts/
 Resources/
 Plots/
