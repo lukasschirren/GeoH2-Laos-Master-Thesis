@@ -26,6 +26,7 @@ import pandas as pd
 import os
 
 logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 weather_excel_path = "Parameters/weather_parameters.xlsx"
 
