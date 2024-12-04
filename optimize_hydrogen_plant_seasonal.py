@@ -133,6 +133,7 @@ def demand_schedule(quantity, transport_state, transport_excel_path,
 
     return trucking_hourly_demand_schedule, pipeline_hourly_demand_schedule
 
+
 def optimize_hydrogen_plant(wind_potential, pv_potential, hydro_potential, times, demand_profile, 
                             wind_max_capacity, pv_max_capacity, hydro_max_capacity,
                             country_series, water_limit=None):
@@ -195,60 +196,66 @@ def optimize_hydrogen_plant(wind_potential, pv_potential, hydro_potential, times
             return lcoh, wind_capacity, solar_capacity, hydro_capacity, electrolyzer_capacity, battery_capacity, h2_storage
 
     # Set up network
-    # Import a generic network
     n = pypsa.Network(override_component_attrs=aux.create_override_components())
-
-    # Set the time values for the network
     n.set_snapshots(times)
 
     # Import the design of the H2 plant into the network
     n.import_from_csv_folder("Parameters_3/Basic_H2_plant")
 
+    # Add electrolyzer as a link with unit commitment
+    electrolyzer_min_on_time = 3  # Minimum 3 hours of operation
+    electrolyzer_min_off_time = 2  # Minimum 2 hours of downtime
+    n.add("Link", "Electrolysis",
+          bus0="Electricity",
+          bus1="Hydrogen",
+          efficiency=0.7,  # Example efficiency
+          capital_cost=700,  # Example cost
+          p_nom_extendable=True,  # Allow capacity to be optimized
+          unit_commitment=True)  # Enable unit commitment
+
+    # Set minimum on/off times
+    n.links.at["Electrolysis", "min_up_time"] = electrolyzer_min_on_time
+    n.links.at["Electrolysis", "min_down_time"] = electrolyzer_min_off_time
+
     # Import demand profile
     # Note: All flows are in MW or MWh, conversions for hydrogen done using HHVs. Hydrogen HHV = 39.4 MWh/t
-    # hydrogen_demand = pd.read_excel(demand_path,index_col = 0) # Excel file in kg hydrogen, convert to MWh
     n.add('Load', 'Hydrogen demand', bus='Hydrogen', p_set=demand_profile['Demand'] / 1000 * 39.4)
 
     # Send the weather data to the model
     n.generators_t.p_max_pu['Wind'] = wind_potential
     n.generators_t.p_max_pu['Solar'] = pv_potential
-
     n.generators_t.p_max_pu['Hydro'] = hydro_potential
+
     # Specify maximum capacity based on land use
     n.generators.loc['Hydro', 'p_nom_max'] = hydro_max_capacity
-    n.generators.loc['Wind', 'p_nom_max'] = wind_max_capacity * 2 # ADDING rated power - here 2 MW
-    n.generators.loc['Solar', 'p_nom_max'] = pv_max_capacity * 1 # ADDING the power for each node - here 1 MW
+    n.generators.loc['Wind', 'p_nom_max'] = wind_max_capacity * 2  # Rated power - here 2 MW
+    n.generators.loc['Solar', 'p_nom_max'] = pv_max_capacity * 1  # Power per node - here 1 MW
 
-    # Specify technology-specific and country-specific WACC and lifetime here
+    # Specify technology-specific and country-specific WACC and lifetime
     n.generators.loc['Hydro', 'capital_cost'] *= CRF(country_series['Hydro interest rate'], 
                                                     country_series['Hydro lifetime'])
     n.generators.loc['Wind', 'capital_cost'] *= CRF(country_series['Wind interest rate'], 
                                                     country_series['Wind lifetime (years)'])
     n.generators.loc['Solar', 'capital_cost'] *= CRF(country_series['Solar interest rate'], 
                                                      country_series['Solar lifetime (years)'])
-
     for item in [n.links, n.stores, n.storage_units]:
         item.capital_cost = item.capital_cost * CRF(country_series['Plant interest rate'], country_series['Plant lifetime (years)'])
 
-    # Solve the model
+    # Solve the model with unit commitment
     solver = 'gurobi'
-    # n.optimize(solver_name=solver,
-    #        solver_options={'LogToConsole': 0, 'OutputFlag': 0},
-    #        extra_functionality=aux.extra_functionalities)
     n.lopf(solver_name=solver,
-           solver_options = {'LogToConsole':0, 'OutputFlag':0},
-           pyomo=False,
-           extra_functionality=aux.extra_functionalities,
-           )
+           solver_options={'LogToConsole': 0, 'OutputFlag': 0},
+           pyomo=True,  # Enable Pyomo for unit commitment
+           extra_functionality=aux.extra_functionalities)
 
     # Output results
-    lcoh = n.objective / (n.loads_t.p_set.sum().iloc[0] / 39.4 * 1000)  # convert back to kg H2
+    lcoh = n.objective / (n.loads_t.p_set.sum().iloc[0] / 39.4 * 1000)  # Convert back to kg H2
     wind_capacity = n.generators.p_nom_opt['Wind']
     solar_capacity = n.generators.p_nom_opt['Solar']
-    hydro_capacity = n.generators.p_nom_opt.get('Hydro', np.nan)  # get hydro capacity if it exists
+    hydro_capacity = n.generators.p_nom_opt.get('Hydro', np.nan)  # Get hydro capacity if it exists
     electrolyzer_capacity = n.links.p_nom_opt['Electrolysis'] 
-    battery_capacity = n.storage_units.p_nom_opt['Battery']
-    h2_storage = n.stores.e_nom_opt['Compressed H2 Store']
+    battery_capacity = n.storage_units.p_nom_opt.get('Battery', np.nan)
+    h2_storage = n.stores.e_nom_opt.get('Compressed H2 Store', np.nan)
     print(lcoh)
     return lcoh, wind_capacity, solar_capacity, hydro_capacity, electrolyzer_capacity, battery_capacity, h2_storage
 
