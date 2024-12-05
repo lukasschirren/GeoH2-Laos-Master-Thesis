@@ -208,8 +208,7 @@ def optimize_hydrogen_plant(wind_potential, pv_potential, hydro_potential, times
     n.add("Link", "Electrolysis",
           bus0="Electricity",
           bus1="Hydrogen",
-          efficiency=0.7,  # Example efficiency
-          capital_cost=700,  # Example cost
+        #   efficiency=0.7, 
           p_nom_extendable=True,  # Allow capacity to be optimized
           unit_commitment=True)  # Enable unit commitment
 

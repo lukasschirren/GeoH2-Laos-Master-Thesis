@@ -28,7 +28,7 @@ import os
 logging.basicConfig(level=logging.INFO)
 logging.basicConfig(level=logging.DEBUG)
 
-weather_excel_path = "Parameters/weather_parameters.xlsx"
+weather_excel_path = "Parameters_1/weather_parameters.xlsx"
 
 weather_parameters = pd.read_excel(weather_excel_path,
                                    index_col = 'Parameters'
