@@ -284,60 +284,60 @@ if __name__ == "__main__":
     # Added for hydropower
     location_hydro = gpd.read_file('Data_3/hydropower_dams.gpkg')
     location_hydro.rename(columns={'Latitude': 'lat', 'Longitude': 'lon'}, inplace=True)
-    # Monthly generation columns
-    monthly_columns = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    # # Monthly generation columns
+    # monthly_columns = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-    # Hours in each month for the year 2023
-    hours_in_month = {
-        'Jan': 744, 'Feb': 672, 'Mar': 744, 'Apr': 720,
-        'May': 744, 'Jun': 720, 'Jul': 744, 'Aug': 744,
-        'Sep': 720, 'Oct': 744, 'Nov': 720, 'Dec': 744
-    }
+    # # Hours in each month for the year 2023
+    # hours_in_month = {
+    #     'Jan': 744, 'Feb': 672, 'Mar': 744, 'Apr': 720,
+    #     'May': 744, 'Jun': 720, 'Jul': 744, 'Aug': 744,
+    #     'Sep': 720, 'Oct': 744, 'Nov': 720, 'Dec': 744
+    # }
 
-    # Initialize an empty DataFrame to store hourly capacity factors
-    hourly_capacity_factors = pd.DataFrame()
+    # # Initialize an empty DataFrame to store hourly capacity factors
+    # hourly_capacity_factors = pd.DataFrame()
 
     
-    # Iterate over each plant
-    for index, row in location_hydro.iterrows():
-        plant_name = row['Name']
-        plant_capacity = row['Total capacity (MW)']
+    # # Iterate over each plant
+    # for index, row in location_hydro.iterrows():
+    #     plant_name = row['Name']
+    #     plant_capacity = row['Total capacity (MW)']
         
-        # Generate an empty list to hold hourly capacity factors for the plant
-        plant_hourly_factors = []
+    #     # Generate an empty list to hold hourly capacity factors for the plant
+    #     plant_hourly_factors = []
 
-        # Spread the generation for each month evenly across the respective hours
-        for month in monthly_columns:
-            monthly_generation = row[month] * 1000  # Convert GWh to MWh
-            hourly_generation = monthly_generation / hours_in_month[month]  # MWh per hour
-            hourly_capacity_factor = hourly_generation / plant_capacity  # Capacity factor
+    #     # Spread the generation for each month evenly across the respective hours
+    #     for month in monthly_columns:
+    #         monthly_generation = row[month] * 1000  # Convert GWh to MWh
+    #         hourly_generation = monthly_generation / hours_in_month[month]  # MWh per hour
+    #         hourly_capacity_factor = hourly_generation / plant_capacity  # Capacity factor
             
-            # Repeat this capacity factor for each hour of the month
-            plant_hourly_factors.extend([hourly_capacity_factor] * hours_in_month[month])
+    #         # Repeat this capacity factor for each hour of the month
+    #         plant_hourly_factors.extend([hourly_capacity_factor] * hours_in_month[month])
 
-        # Add the plant's hourly capacity factors to the DataFrame
-        hourly_capacity_factors[plant_name] = plant_hourly_factors
+    #     # Add the plant's hourly capacity factors to the DataFrame
+    #     hourly_capacity_factors[plant_name] = plant_hourly_factors
 
+    # # Extend the data by adding the last hour's capacity factors for an additional 24 hours
+    # last_hour = hourly_capacity_factors.iloc[-1]  # Get the last hour's data
+    # extended_hours = pd.DataFrame([last_hour] * 24, columns=hourly_capacity_factors.columns)
+    # hourly_capacity_factors = pd.concat([hourly_capacity_factors, extended_hours], ignore_index=True)
 
-    # Extend the data by adding the last hour's capacity factors for an additional 24 hours
-    last_hour = hourly_capacity_factors.iloc[-1]  # Get the last hour's data
-    extended_hours = pd.DataFrame([last_hour] * 24, columns=hourly_capacity_factors.columns)
-    hourly_capacity_factors = pd.concat([hourly_capacity_factors, extended_hours], ignore_index=True)
+    # # Create a time index for the year 2023 plus the first hour of 2024
+    # time_index = pd.date_range(start='2023-01-01', end='2024-01-01 23:00', freq='H')
 
-    # Create a time index for the year 2023 plus the first hour of 2024
-    time_index = pd.date_range(start='2023-01-01', end='2024-01-01 23:00', freq='H')
-
-    # Ensure the time index matches the length of the DataFrame
-    hourly_capacity_factors.index = time_index
+    # # Ensure the time index matches the length of the DataFrame
+    # hourly_capacity_factors.index = time_index
     
-    # Convert the DataFrame to an xarray DataArray
-    capacity_factor_array = xr.DataArray(
-        data=hourly_capacity_factors.values,
-        dims=['time', 'plant'],
-        coords={'time': time_index, 'plant': location_hydro['Name'].values}
-    )
-    
-    location_hydro['geometry'] = gpd.points_from_xy(location_hydro.lon, location_hydro.lat)
+    # # Convert the DataFrame to an xarray DataArray
+    # capacity_factor_array = xr.DataArray(
+    #     data=hourly_capacity_factors.values,
+    #     dims=['time', 'plant'],
+    #     coords={'time': time_index, 'plant': location_hydro['Name'].values}
+    # )
+    # PRESUMABLY NOT RELEVANT
+
+    capacity_factor_array = xr.open_dataarray("capacity_factors_dry_2025.nc")
 
     if 'index_left' in location_hydro.columns:
         location_hydro = location_hydro.rename(columns={'index_left': 'index_left_renamed'})
